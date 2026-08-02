@@ -1,0 +1,15 @@
+# MDIO Probe v2 board configuration
+#
+# Copyright (c) 2026 Meshium
+# SPDX-License-Identifier: Apache-2.0
+
+if BOARD_MDIOPROBE_V2
+
+# The capture path drives SPI2 directly via LL; the Zephyr SPI driver is
+# only kept around so its init applies the spi2 pinctrl group. Interrupt
+# mode keeps it from pulling in DMA plumbing we manage ourselves.
+config SPI_STM32_INTERRUPT
+	default y
+	depends on SPI
+
+endif # BOARD_MDIOPROBE_V2

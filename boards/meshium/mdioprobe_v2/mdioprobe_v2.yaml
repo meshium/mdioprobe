@@ -1,0 +1,21 @@
+identifier: mdioprobe_v2
+name: Meshium MDIO Probe v2
+type: mcu
+arch: arm
+toolchain:
+  - zephyr
+  - gnuarmemb
+ram: 128
+flash: 512
+supported:
+  - adc
+  - counter
+  - dma
+  - flash
+  - gpio
+  - i2c
+  - spi
+  - uart
+  - usb_device
+  - watchdog
+vendor: meshium

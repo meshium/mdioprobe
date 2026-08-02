@@ -1,0 +1,402 @@
+/*
+ * Copyright (c) 2026 Meshium
+ *               Aleksandr Senin <al@meshium.net>
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * MDIO Probe v2 — STM32G474CET6 (LQFP48), custom carrier board.
+ *
+ * Capture path pin assignment is identical to the mdioprobe_g474 bring-up
+ * board; what were jumper wires there are PCB traces here:
+ *
+ *   PA0 (COMP1_OUT, MDC digital)  --trace--> PB13 (SPI2_SCK)
+ *   PA8 (COMP7_OUT, MDIO digital) --trace--> PB15 (SPI2_MOSI)
+ *   PA10 (HRTIM1_CHB1, NSS latch) --trace--> PB12 (SPI2_NSS)
+ *
+ * Everything on the capture chain (COMP1/COMP7, DAC3/DAC4 thresholds,
+ * TIM3 one-pulse counter, HRTIM SR-latch, SPI2 slave + DMA1) is set up
+ * from LL code, not from DT — see docs/CAPTURE.md.
+ */
+
+/dts-v1/;
+#include <st/g4/stm32g474Xe.dtsi>
+#include <st/g4/stm32g474c(b-c-e)tx-pinctrl.dtsi>
+#include <zephyr/dt-bindings/gpio/gpio.h>
+#include <zephyr/dt-bindings/adc/adc.h>
+#include <zephyr/dt-bindings/i2c/i2c.h>
+
+/ {
+	model = "Meshium MDIO Probe v2";
+	compatible = "meshium,mdioprobe-v2";
+
+	chosen {
+		zephyr,sram = &sram0;
+		zephyr,flash = &flash0;
+		/*
+		 * No VCP on this board: the console is a USB CDC ACM port.
+		 * Declared here rather than by the `cdc-acm-console` snippet,
+		 * because the firmware builds its own USB device — it has to
+		 * be able to tear CDC down and come back as mass storage, and
+		 * the snippet only ever registers CDC.
+		 */
+		zephyr,console = &cdc_acm_console;
+	};
+
+	/*
+	 * Colours verified on hardware 2026-07-22: the initial pinout notes
+	 * had them the other way round (PA9=R, PB11=G) — the board actually
+	 * wires PA9 to green and PB11 to red.
+	 */
+	leds: leds {
+		compatible = "gpio-leds";
+
+		green_led: led_g {
+			gpios = <&gpioa 9 GPIO_ACTIVE_LOW>;
+			label = "LED_G";
+		};
+
+		red_led: led_r {
+			gpios = <&gpiob 11 GPIO_ACTIVE_LOW>;
+			label = "LED_R";
+		};
+	};
+
+	aliases {
+		led0 = &green_led;
+		led1 = &red_led;
+		watchdog0 = &iwdg;
+		die-temp0 = &die_temp;
+		volt-sensor0 = &vref;
+		volt-sensor1 = &vbat;
+	};
+
+	/*
+	 * Bitbang Clause-22 master (the "generate" half of the probe).
+	 *
+	 * MDC leaves the board through an external tri-state buffer:
+	 *   MDC_EN  (PB6, active LOW) enables the buffer output;
+	 *   MDC_OUT (PB7) is the bitbang clock fed into the buffer input.
+	 * The buffer is powered from the programmable translator supply
+	 * (see mdioprobe_vreg.c) so MDC swings at the target's logic level.
+	 * Its output also loops back to PA1/COMP1, so the sniffer's clock
+	 * front end sees the probe's own MDC.
+	 *
+	 * MDIO is split: PB8 drives the line (open-drain, no pull, parked
+	 * as Analog while receiving so it cannot load the bus), while the
+	 * read-back path is the *sniffer* front end — PB14 → COMP7, whose
+	 * digital output the master samples. Reading through the comparator
+	 * means the master works at whatever logic level the target uses,
+	 * with the same DAC threshold the capture path was calibrated to.
+	 */
+	mdio_master: mdio_master {
+		compatible = "mdioprobe,mdio-master";
+		status = "okay";
+		mdc-gpios = <&gpiob 7 GPIO_ACTIVE_HIGH>;
+		/*
+		 * Open-drain: a 4.7 kΩ pull-up to VREG (the buffer's supply)
+		 * makes the inactive level. Driving it push-pull would
+		 * back-power the VREG rail from the 3.3 V domain.
+		 */
+		mdc-en-gpios = <&gpiob 6 (GPIO_ACTIVE_LOW | GPIO_OPEN_DRAIN)>;
+		mdio-out-gpios = <&gpiob 8 (GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN)>;
+	};
+
+	mdioprobe_config {
+		compatible = "mdioprobe,config";
+		/*
+		 * MDIO idle-voltage sense. PB14 is shared three ways:
+		 * ADC1_IN5 (this channel), COMP7_INP (sniffer) and the
+		 * bitbang master's read-back. All three are read-only —
+		 * the pin stays Analog at all times.
+		 */
+		io-channels = <&adc1 5>;
+		io-channel-names = "mdio_adc";
+		/*
+		 * PHY_RST on the target connector: open-drain, no pull —
+		 * the line must be pulled up by the target's own supply.
+		 */
+		target-reset-gpios = <&gpiob 5 (GPIO_ACTIVE_LOW | GPIO_OPEN_DRAIN)>;
+	};
+
+};
+
+&clk_hsi {
+	status = "okay";
+};
+
+/*
+ * No crystal on the board: HSI16 feeds the PLL for the 170 MHz core
+ * clock, and the USB FS peripheral runs off HSI48.
+ *
+ * HSI48 free-running is only ~±3 % over temperature, which is outside
+ * the ±0.25 % USB FS requires. `src/mdioprobe_usb.c` enables the CRS
+ * peripheral to auto-trim HSI48 against USB SOF packets — Zephyr's G4
+ * clock driver does not do this for us.
+ */
+&clk_hsi48 {
+	status = "okay";
+};
+
+&pll {
+	div-m = <4>;
+	mul-n = <85>;
+	div-p = <2>;
+	div-q = <2>;
+	div-r = <2>;
+	clocks = <&clk_hsi>;
+	status = "okay";
+};
+
+&rcc {
+	clocks = <&pll>;
+	clock-frequency = <DT_FREQ_M(170)>;
+	ahb-prescaler = <1>;
+	apb1-prescaler = <1>;
+	apb2-prescaler = <1>;
+};
+
+zephyr_udc0: &usb {
+	cdc_acm_console: cdc_acm_console {
+		compatible = "zephyr,cdc-acm-uart";
+	};
+
+	pinctrl-0 = <&usb_dm_pa11 &usb_dp_pa12>;
+	pinctrl-names = "default";
+	status = "okay";
+};
+
+/*
+ * Drop the default internal pull-down from SPI2 SCK/MOSI. The bus is
+ * push-pull driven on-die by COMP1_OUT (PA0) and COMP7_OUT (PA8) through
+ * short PCB traces; a ~40 kΩ pull-down would skew rising edges at
+ * multi-MHz MDC. NSS keeps its pull-up — the HRTIM latch (POL1=1) rests
+ * it inactive HIGH between frames.
+ */
+&pinctrl {
+	spi2_sck_pb13_nopull: spi2_sck_pb13_nopull {
+		pinmux = <STM32_PINMUX('B', 13, AF5)>;
+		slew-rate = "very-high-speed";
+	};
+
+	spi2_mosi_pb15_nopull: spi2_mosi_pb15_nopull {
+		pinmux = <STM32_PINMUX('B', 15, AF5)>;
+		slew-rate = "very-high-speed";
+	};
+};
+
+/*
+ * SPI2 slave = the capture engine. The Zephyr driver is enabled only so
+ * its init applies this pinctrl group (PB12/PB13/PB15 → AF5); the API is
+ * never called. src/mdioprobe_mdio_api.c programs SPI2 + DMA1_Channel1 +
+ * DMAMUX1 directly. Note PB14 is deliberately NOT listed — on this board
+ * it is the analog MDIO sense pin, not SPI2_MISO.
+ */
+&spi2 {
+	pinctrl-0 = <&spi2_sck_pb13_nopull &spi2_mosi_pb15_nopull &spi2_nss_pb12>;
+	pinctrl-names = "default";
+	status = "okay";
+};
+
+&adc1 {
+	pinctrl-0 = <&adc1_in5_pb14>;
+	pinctrl-names = "default";
+	/* AHB/4 = 42.5 MHz, comfortably under the 60 MHz ADC ceiling. */
+	st,adc-clock-source = "SYNC";
+	st,adc-prescaler = <4>;
+	status = "okay";
+	#address-cells = <1>;
+	#size-cells = <0>;
+
+	/* PB14 = ADC1_IN5 — MDIO idle level (also COMP7_INP@INPSEL=0). */
+	channel@5 {
+		reg = <5>;
+		zephyr,gain = "ADC_GAIN_1";
+		zephyr,reference = "ADC_REF_INTERNAL";
+		zephyr,acquisition-time = <ADC_ACQ_TIME_DEFAULT>;
+		zephyr,resolution = <12>;
+	};
+};
+
+/*
+ * ADC2_IN12 (PB2, translator Vout sense) and DAC1_CH1 (PA4, MOSFET gate)
+ * are driven from LL inside src/mdioprobe_vreg.c — the 10 kHz control
+ * loop needs direct register access, so no Zephyr ADC/DAC node here.
+ * DAC3_CH1 / DAC4_CH1 (comparator thresholds) are internal-only on G4:
+ * no pin, no pinctrl, configured from src/mdioprobe_adc_dac.c.
+ */
+
+/*
+ * QSPI NOR: Winbond W25Q80DVSNIG, 8 Mbit, on bank 1.
+ *   PA3 CLK, PA2 NCS, PB1 IO0, PB0 IO1, PA7 IO2, PA6 IO3.
+ */
+/ {
+	/*
+	 * Block device over the storage partition, and the FAT volume on it.
+	 *
+	 * The volume is called "flash" because that is what it is — a NOR
+	 * flash chip. FatFs only takes volume strings from a built-in list
+	 * unless custom ones are declared, so prj.conf declares this one
+	 * rather than borrowing "NAND", which would be wrong about the part.
+	 * cache-size matches the chip's 4 KiB erase block — the flash-disk
+	 * layer needs a whole block to do read-modify-write.
+	 *
+	 * Zephyr mounts it (automount) so the volume is available to C as
+	 * well; MicroPython then wraps the same mount through
+	 * zephyr.FileSystem, which is what makes `import` and `open()` work
+	 * over it.
+	 */
+	qspi_disk: qspi_disk {
+		compatible = "zephyr,flash-disk";
+		partition = <&qspi_storage_partition>;
+		disk-name = "flash";
+		cache-size = <4096>;
+	};
+
+	fstab {
+		compatible = "zephyr,fstab";
+
+		qspi_fs: qspi_fs {
+			compatible = "zephyr,fstab,fatfs";
+			mount-point = "/flash:";
+			disk-access;
+			automount;
+		};
+	};
+};
+
+&quadspi {
+	pinctrl-0 = <&quadspi1_clk_pa3 &quadspi1_bk1_ncs_pa2
+		     &quadspi1_bk1_io0_pb1 &quadspi1_bk1_io1_pb0
+		     &quadspi1_bk1_io2_pa7 &quadspi1_bk1_io3_pa6>;
+	pinctrl-names = "default";
+	status = "okay";
+
+	w25q80dv: qspi-nor-flash@90000000 {
+		compatible = "st,stm32-qspi-nor";
+		reg = <0x90000000 DT_SIZE_M(1)>;
+		size = <DT_SIZE_M(8)>;      /* bits */
+		qspi-max-frequency = <80000000>;
+		spi-bus-width = <4>;
+
+		/*
+		 * Page program opcode. REQUIRED here — the default is wrong for
+		 * this chip and fails silently.
+		 *
+		 * SFDP carries no information about quad program opcodes, so the
+		 * st,stm32-qspi-nor driver assumes a device that reads 1-4-4 also
+		 * programs 1-4-4 and issues 0x38. The W25Q80DV does read 1-4-4
+		 * (0xEB) but its only quad program is 0x32 (1-1-4); 0x38 is not a
+		 * program instruction on this part at all. QSPI has no completion
+		 * status, so the write returns success and nothing reaches the
+		 * die — `flash write` reported "Write OK. Verification ERROR!"
+		 * and the sector stayed 0xFF (2026-07-30).
+		 */
+		writeoc = "PP_1_1_4";
+
+		status = "okay";
+
+		partitions {
+			compatible = "fixed-partitions";
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+			/*
+			 * Reserved for a future MCUboot secondary slot.
+			 *
+			 * It has to be a raw partition: the bootloader reads and
+			 * erases slots through flash_area and knows nothing about
+			 * filesystems, so an image cannot live as a file. The FAT
+			 * volume below is only ever the transport — a host drops
+			 * the image on it over USB MSD and the firmware copies it
+			 * in here.
+			 *
+			 * Internal flash cannot hold a second slot (512 KB total
+			 * against an image already past 220 KB with MicroPython),
+			 * so the slot has to be out here regardless. Sized now
+			 * rather than later because repartitioning destroys the
+			 * FAT volume and everything the user put on it.
+			 */
+			qspi_slot1_partition: partition@0 {
+				label = "image-1";
+				reg = <0x00000000 DT_SIZE_K(384)>;
+			};
+
+			/* Scripts and logs. FAT so a host can read it directly. */
+			qspi_storage_partition: partition@60000 {
+				label = "qspi-storage";
+				reg = <0x00060000 DT_SIZE_K(640)>;
+			};
+		};
+	};
+};
+
+/*
+ * Alternate serial personalities of the target connector:
+ *
+ *   PB9 = USART3_TX / I2C1_SDA
+ *   PB8 = USART3_RX / I2C1_SCL
+ *
+ * Both pins go straight to the connector, bypassing the MDC buffer — so
+ * the serial personalities are fixed 3.3 V with no level translation, and
+ * I2C1_SDA stays bidirectional end to end. The buffer must be off in these
+ * modes or it would fight PB9 on the shared connector line.
+ *
+ * Both nodes are enabled so their drivers exist, but mdioprobe_serial.c
+ * parks them in the "sleep" (Analog) pinctrl state at boot and only applies
+ * "default" to the personality that is actually selected. In MDIO mode
+ * neither peripheral may touch PB8/PB9 — anything driving those pins loads
+ * the bus the analog front end is measuring.
+ */
+&usart3 {
+	pinctrl-0 = <&usart3_tx_pb9 &usart3_rx_pb8>;
+	pinctrl-1 = <&analog_pb9 &analog_pb8>;
+	pinctrl-names = "default", "sleep";
+	current-speed = <115200>;
+	status = "okay";
+};
+
+&i2c1 {
+	pinctrl-0 = <&i2c1_scl_pb8 &i2c1_sda_pb9>;
+	pinctrl-1 = <&analog_pb8 &analog_pb9>;
+	pinctrl-names = "default", "sleep";
+	clock-frequency = <I2C_BITRATE_STANDARD>;
+	status = "okay";
+};
+
+&iwdg {
+	status = "okay";
+};
+
+&rtc {
+	clocks = <&rcc STM32_CLOCK(APB1, 10)>,
+		 <&rcc STM32_SRC_LSI RTC_SEL(2)>;
+	status = "okay";
+};
+
+&clk_lsi {
+	status = "okay";
+};
+
+&flash0 {
+	partitions {
+		compatible = "fixed-partitions";
+		#address-cells = <1>;
+		#size-cells = <1>;
+
+		/*
+		 * No bootloader yet, and no zephyr,code-partition chosen —
+		 * the image links against the whole 512 KB. This entry only
+		 * documents the intended split; the last 32 KB are reserved
+		 * for settings/NVS.
+		 */
+		app_partition: partition@0 {
+			label = "image-0";
+			reg = <0x00000000 DT_SIZE_K(480)>;
+		};
+
+		storage_partition: partition@78000 {
+			label = "storage";
+			reg = <0x00078000 DT_SIZE_K(32)>;
+		};
+	};
+};

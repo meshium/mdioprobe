@@ -1,0 +1,136 @@
+# DSA switch identifiers, extracted from Linux 7.1.0 (6b5a2b7d9bc1)
+# by scripts/gen_chipdb.py -- do not edit by hand.
+#
+# family     id       prod     rev      addr reg access name
+#
+# Unlike PHYs there is no common scheme, so every record carries how
+# to identify the part: the MDIO address and register to read, the
+# mask that isolates the product number, the mask that isolates the
+# revision, and what access it takes:
+#
+#   c22   a plain Clause-22 read -- nothing is written to the bus
+#   c22w  Clause 22, but the addressing needs writes first
+#   spi / i2c / mmio / pci   not reachable over MDIO at all
+#
+# Where one number covers several parts, the discriminator the
+# kernel uses is spelled out in the name in parentheses.
+b53        00000025 ffffffff 00000000   1e  30 c22w  BCM5325
+b53        00000065 ffffffff 00000000   1e  30 c22w  BCM5365
+b53        00000089 ffffffff 00000000   1e  30 c22w  BCM5389
+b53        00000095 ffffffff 00000000   1e  30 c22w  BCM5395
+b53        00000097 ffffffff 00000000   1e  30 c22w  BCM5397
+b53        00000098 ffffffff 00000000   1e  30 c22w  BCM5398
+b53        00004908 ffffffff 00000000   1e  30 c22w  BCM4908
+b53        00005075 ffffffff 00000000   1e  30 c22w  BCM53134
+b53        00005800 ffffffff 00000000   1e  30 c22w  BCM585xx/586xx/88312
+b53        00006300 ffffffff 00000000   1e  30 c22w  BCM63xx
+b53        00007278 ffffffff 00000000   1e  30 c22w  BCM7278
+b53        00007445 ffffffff 00000000   1e  30 c22w  BCM7445
+b53        00053010 ffffffff 00000000   1e  30 c22w  BCM53010
+b53        00053011 ffffffff 00000000   1e  30 c22w  BCM53011
+b53        00053012 ffffffff 00000000   1e  30 c22w  BCM53012
+b53        00053018 ffffffff 00000000   1e  30 c22w  BCM53018
+b53        00053019 ffffffff 00000000   1e  30 c22w  BCM53019
+b53        00053101 ffffffff 00000000   1e  30 c22w  BCM53101
+b53        00053115 ffffffff 00000000   1e  30 c22w  BCM53115
+b53        00053125 ffffffff 00000000   1e  30 c22w  BCM53125
+b53        00053128 ffffffff 00000000   1e  30 c22w  BCM53128
+b53        00058300 ffffffff 00000000   1e  30 c22w  BCM583xx/11360
+hellcreek  00004c30 0000ffff 00000000    -   - mmio  Hirschmann Hellcreek
+ks8995     00000000 000000ff 00000000    -  00 spi   KS8995MA
+ks8995     00000001 000000ff 00000000    -  00 spi   KSZ8864RMN
+ks8995     00000009 000000ff 00000000    -  00 spi   KSZ8795CLX
+ksz        00000088 000000ff 00000000   10  00 c22   KSZ8863/KSZ8873 (family byte)
+ksz        00008463 ffffff00 000000ff    -  00 spi   KSZ8463
+ksz        00008563 ffffff00 000000ff    -  00 spi   KSZ8563
+ksz        00008765 ffffff00 000000ff    -  00 spi   KSZ8765
+ksz        00008794 ffffff00 000000ff    -  00 spi   KSZ8794
+ksz        00008795 ffffff00 000000ff    -  00 spi   KSZ8795
+ksz        00008864 ffffff00 000000ff    -  00 spi   KSZ8864
+ksz        00008895 ffffff00 000000ff    -  00 spi   KSZ8895
+ksz        00856700 ffffff00 000000ff    -  00 spi   KSZ8567
+ksz        00937000 ffffff00 000000ff    -  00 spi   LAN9370
+ksz        00937100 ffffff00 000000ff    -  00 spi   LAN9371
+ksz        00937200 ffffff00 000000ff    -  00 spi   LAN9372
+ksz        00937300 ffffff00 000000ff    -  00 spi   LAN9373
+ksz        00937400 ffffff00 000000ff    -  00 spi   LAN9374
+ksz        00947700 ffffff00 000000ff    -  00 spi   KSZ9477
+ksz        00956300 ffffff00 000000ff    -  00 spi   KSZ9563
+ksz        00956700 ffffff00 000000ff    -  00 spi   KSZ9567
+ksz        00964600 ffffff00 000000ff    -  00 spi   LAN9646
+ksz        00989300 ffffff00 000000ff    -  00 spi   KSZ9893
+ksz        00989600 ffffff00 000000ff    -  00 spi   KSZ9896
+ksz        00989700 ffffff00 000000ff    -  00 spi   KSZ9897
+lan9303    00009303 0000ffff 00000000   11  09 c22   LAN9303
+lan9303    00009352 0000ffff 00000000   11  09 c22   LAN9352 (not probed)
+lan9303    00009353 0000ffff 00000000   11  09 c22   LAN9353 (not probed)
+lan9303    00009354 0000ffff 00000000   11  09 c22   LAN9354
+lan9303    00009355 0000ffff 00000000   11  09 c22   LAN9355 (not probed)
+mt7530     00007530 0000ffff 0000000f    -  7f c22w  MT7530
+mt7530     00007531 0000ffff 0000000f    -  78 c22w  MT7531
+mv88e6060  00000600 0000fff0 0000000f   08  03 c22   Marvell 88E6060
+mv88e6xxx  00000200 0000fff0 0000000f   08  03 c22   Marvell 88E6020
+mv88e6xxx  000004a0 0000fff0 0000000f   10  03 c22   Marvell 88E6085
+mv88e6xxx  00000710 0000fff0 0000000f   08  03 c22   Marvell 88E6071
+mv88e6xxx  00000950 0000fff0 0000000f   10  03 c22   Marvell 88E6095/88E6095F
+mv88e6xxx  00000990 0000fff0 0000000f   10  03 c22   Marvell 88E6097/88E6097F
+mv88e6xxx  00000a00 0000fff0 0000000f   00  03 c22   Marvell 88E6190X
+mv88e6xxx  00000a10 0000fff0 0000000f   00  03 c22   Marvell 88E6390X
+mv88e6xxx  00001060 0000fff0 0000000f   10  03 c22   Marvell 88E6131
+mv88e6xxx  00001150 0000fff0 0000000f   10  03 c22   Marvell 88E6320
+mv88e6xxx  00001210 0000fff0 0000000f   10  03 c22   Marvell 88E6123
+mv88e6xxx  00001610 0000fff0 0000000f   10  03 c22   Marvell 88E6161
+mv88e6xxx  00001650 0000fff0 0000000f   10  03 c22   Marvell 88E6165
+mv88e6xxx  00001710 0000fff0 0000000f   10  03 c22   Marvell 88E6171
+mv88e6xxx  00001720 0000fff0 0000000f   10  03 c22   Marvell 88E6172
+mv88e6xxx  00001750 0000fff0 0000000f   10  03 c22   Marvell 88E6175
+mv88e6xxx  00001760 0000fff0 0000000f   10  03 c22   Marvell 88E6176
+mv88e6xxx  00001900 0000fff0 0000000f   00  03 c22   Marvell 88E6190
+mv88e6xxx  00001910 0000fff0 0000000f   00  03 c22   Marvell 88E6191
+mv88e6xxx  00001920 0000fff0 0000000f   00  03 c22   Marvell 88E6191X
+mv88e6xxx  00001930 0000fff0 0000000f   00  03 c22   Marvell 88E6193X
+mv88e6xxx  00001a70 0000fff0 0000000f   10  03 c22   Marvell 88E6185
+mv88e6xxx  00002200 0000fff0 0000000f   08  03 c22   Marvell 88E6220
+mv88e6xxx  00002400 0000fff0 0000000f   10  03 c22   Marvell 88E6240
+mv88e6xxx  00002500 0000fff0 0000000f   08  03 c22   Marvell 88E6250
+mv88e6xxx  00002610 0000fff0 0000000f   00  03 c22   Marvell 88E6361
+mv88e6xxx  00002900 0000fff0 0000000f   00  03 c22   Marvell 88E6290
+mv88e6xxx  00003100 0000fff0 0000000f   10  03 c22   Marvell 88E6321
+mv88e6xxx  00003400 0000fff0 0000000f   10  03 c22   Marvell 88E6141
+mv88e6xxx  00003410 0000fff0 0000000f   10  03 c22   Marvell 88E6341
+mv88e6xxx  00003520 0000fff0 0000000f   10  03 c22   Marvell 88E6352
+mv88e6xxx  00003710 0000fff0 0000000f   10  03 c22   Marvell 88E6350
+mv88e6xxx  00003750 0000fff0 0000000f   10  03 c22   Marvell 88E6351
+mv88e6xxx  00003900 0000fff0 0000000f   00  03 c22   Marvell 88E6390
+mv88e6xxx  00003930 0000fff0 0000000f   00  03 c22   Marvell 88E6393X
+qca8k      00000012 0000ff00 000000ff   18  00 c22w  QCA8327/QCA8328
+qca8k      00000013 0000ff00 000000ff   18  00 c22w  QCA8334/QCA8337
+rtl8365mb  00006367 ffffffff 00000000    -  00 c22w  RTL8365MB-VC (ver 0x0040)
+rtl8365mb  00006367 ffffffff 00000000    -  00 c22w  RTL8367RB-VB (ver 0x0020)
+rtl8365mb  00006367 ffffffff 00000000    -  00 c22w  RTL8367S (ver 0x00A0)
+rtl8366rb  00005937 0000ffff 0000000f    -   - c22w  RTL8366RB
+sja1105    9c00000c ffffffff 00000000    -   - spi   SJA1105E (part 0x9a83)
+sja1105    9e00030e ffffffff 00000000    -   - spi   SJA1105T (part 0x9a83)
+sja1105    ae00030e ffffffff 00000000    -   - spi   SJA1105Q (part 0x9a85)
+sja1105    ae00030e ffffffff 00000000    -   - spi   SJA1105S (part 0x9a87)
+sja1105    af00030e ffffffff 00000000    -   - spi   SJA1105P (part 0x9a84)
+sja1105    af00030e ffffffff 00000000    -   - spi   SJA1105R (part 0x9a86)
+sja1105    b700030f ffffffff 00000000    -   - spi   SJA1110A (part 0x1110)
+sja1105    b700030f ffffffff 00000000    -   - spi   SJA1110B (part 0x1111)
+sja1105    b700030f ffffffff 00000000    -   - spi   SJA1110C (part 0x1112)
+sja1105    b700030f ffffffff 00000000    -   - spi   SJA1110D (part 0x1113)
+vsc73xx    00007385 0000ffff 0000000f    -   - spi   VSC7385
+vsc73xx    00007388 0000ffff 0000000f    -   - spi   VSC7388
+vsc73xx    00007395 0000ffff 0000000f    -   - spi   VSC7395
+vsc73xx    00007398 0000ffff 0000000f    -   - spi   VSC7398
+xrs700x    00000100 ffffffff 00000000    -  00 c22w  XRS7003E
+xrs700x    00000101 ffffffff 00000000    -  00 c22w  XRS7003F
+xrs700x    00000200 ffffffff 00000000    -  00 c22w  XRS7004E
+xrs700x    00000201 ffffffff 00000000    -  00 c22w  XRS7004F
+yt921x     00009001 ffff0000 00000000    -   - c22w  YT9218MB
+yt921x     00009001 ffff0000 00000000    -   - c22w  YT9218N
+yt921x     00009002 ffff0000 00000000    -   - c22w  YT9213NB
+yt921x     00009002 ffff0000 00000000    -   - c22w  YT9214NB
+yt921x     00009002 ffff0000 00000000    -   - c22w  YT9215RB
+yt921x     00009002 ffff0000 00000000    -   - c22w  YT9215S
+yt921x     00009002 ffff0000 00000000    -   - c22w  YT9215SC

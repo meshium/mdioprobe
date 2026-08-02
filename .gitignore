@@ -1,0 +1,23 @@
+# Zephyr build tree
+build/
+
+# clangd / editor index
+.cache/
+
+# Assistant working directory — machine-local, never shared
+.claude/
+
+# macOS
+.DS_Store
+
+# Generated at build time from version.txt + git
+/build/generated/
+__pycache__/
+
+# KiCad: regenerable caches and per-user local settings. fp-info-cache alone
+# is 4 MB and is rebuilt from the footprint libraries on demand.
+hardware/fp-info-cache
+*.kicad_prl
+*-backups/
+*.kicad_pcb-bak
+*.kicad_sch-bak

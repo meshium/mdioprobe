@@ -1,0 +1,43 @@
+description: |
+  Bitbang Clause-22 MDIO master with a tri-state MDC output buffer and a
+  split MDIO path (separate drive pin, comparator read-back).
+
+  This is NOT `zephyr,mdio-gpio`: that driver assumes one bidirectional
+  MDIO pin it can flip between output and input. Here the drive pin and the
+  sense pin are different pieces of hardware — PB8 drives the line, while
+  the value is read from COMP7's digital output (fed by PB14). The driver
+  lives in src/mdioprobe_mdio_master.c.
+
+compatible: "mdioprobe,mdio-master"
+
+properties:
+  mdc-gpios:
+    type: phandle-array
+    required: true
+    description: |
+      Bitbang clock output feeding the external tri-state buffer input
+      (MDC_OUT, PB7).
+
+  mdc-en-gpios:
+    type: phandle-array
+    required: true
+    description: |
+      Output-enable of the external MDC buffer (MDC_EN, PB6, active low).
+      De-asserted whenever the probe is sniffing so the board never drives
+      the target's clock line.
+
+      Must be open-drain: the line has a 4.7 kΩ pull-up to VREG, the
+      buffer's own supply, which forms the inactive level. A push-pull
+      driver would feed the 3.3 V domain into the regulated VREG rail
+      through that resistor and hold it near 3.3 V.
+
+  mdio-out-gpios:
+    type: phandle-array
+    required: true
+    description: |
+      MDIO drive pin (PB8). Open-drain, no pull while transmitting; parked
+      as Analog (high-Z) while receiving or sniffing.
+
+# No clock-frequency property: GPIO bitbang tops out near 150 kHz whatever
+# you ask for, so the driver pins MDC there instead of pretending it is
+# tunable.

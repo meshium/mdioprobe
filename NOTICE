@@ -1,0 +1,111 @@
+mdioprobe v2
+Copyright (c) 2026 Meshium
+                   Aleksandr Senin <al@meshium.net>
+
+Licensed under the Apache License, Version 2.0. See LICENSE.
+
+--------------------------------------------------------------------------
+
+This product includes third-party software. The firmware image is a static
+link, so a binary release contains all of it — which is why these notices
+belong with the binary and not only with the source tree.
+
+Each component is listed with what it is, where it comes from, and the
+licence it is under. Where a licence requires its full text to travel with
+the distribution, the upstream copy is the authority; the pointers below say
+where to find it.
+
+
+Zephyr RTOS
+    https://github.com/zephyrproject-rtos/zephyr
+    Copyright (c) The Zephyr Project contributors
+    Apache License 2.0 — the same licence as this work; see LICENSE.
+
+CMSIS (ARM Cortex Microcontroller Software Interface Standard)
+    https://github.com/zephyrproject-rtos/cmsis
+    Copyright (c) ARM Limited and contributors
+    Apache License 2.0 — see LICENSE.
+
+MicroPython, and micropython-lib
+    https://github.com/micropython/micropython
+    Copyright (c) 2013-2026 Damien P. George, and contributors
+    MIT License.
+
+    Permission is hereby granted, free of charge, to any person obtaining a
+    copy of this software and associated documentation files (the
+    "Software"), to deal in the Software without restriction, including
+    without limitation the rights to use, copy, modify, merge, publish,
+    distribute, sublicense, and/or sell copies of the Software, and to
+    permit persons to whom the Software is furnished to do so, subject to
+    the following conditions:
+
+    The above copyright notice and this permission notice shall be included
+    in all copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+    OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+    MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+    IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+    CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+    TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+    SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+STM32Cube HAL and LL drivers, via the Zephyr hal_stm32 module
+    https://github.com/zephyrproject-rtos/hal_stm32
+    Copyright (c) STMicroelectronics
+    BSD-3-Clause for the driver sources this firmware uses
+    (stm32cube/stm32g4xx/drivers); Apache-2.0 for the SoC headers
+    (stm32cube/stm32g4xx/soc). Upstream LICENSE gives the full scheme.
+
+    Redistribution and use in source and binary forms, with or without
+    modification, are permitted provided that the following conditions are
+    met: redistributions of source code must retain the above copyright
+    notice, this list of conditions and the following disclaimer;
+    redistributions in binary form must reproduce them in the documentation
+    and/or other materials provided with the distribution; and neither the
+    name of STMicroelectronics nor the names of its contributors may be used
+    to endorse or promote products derived from this software without
+    specific prior written permission.
+
+    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+    IS" AND ANY EXPRESS OR IMPLIED WARRANTIES ARE DISCLAIMED.
+
+FatFs — generic FAT filesystem module
+    http://elm-chan.org/fsw/ff/
+    Copyright (C) 2022, ChaN, all right reserved.
+
+    FatFs module is an open source software. Redistribution and use of FatFs
+    in source and binary forms, with or without modification, are permitted
+    provided that the following condition is met:
+
+    1. Redistributions of source code must retain the above copyright
+       notice, this condition and the following disclaimer.
+
+    This software is provided by the copyright holder and contributors "AS
+    IS" and any warranties related to this software are DISCLAIMED. The
+    copyright owner or contributors be NOT LIABLE for any damages caused by
+    use of this software.
+
+picolibc — the C library, from the Zephyr SDK
+    https://github.com/picolibc/picolibc
+    Copyright (c) Keith Packard, The Newlib Project, and contributors
+    BSD-3-Clause and other BSD-style terms; see the upstream COPYING file
+    for the per-file breakdown.
+
+libgcc — compiler runtime, from the Zephyr SDK
+    Copyright (c) Free Software Foundation, Inc.
+    GPL version 3 with the GCC Runtime Library Exception, which is what
+    permits linking it into a work that is not under the GPL.
+
+--------------------------------------------------------------------------
+
+Derived data, listed separately because its provenance is not a licence
+question that has been settled here:
+
+data/chipdb/ and src/python/cli/chipdb.py are produced by
+scripts/gen_chipdb.py from the source of the Linux kernel, which is GPL-2.0
+only. The extracted content is identifiers, bit masks and part names — facts
+about hardware, most of which also appear in vendor datasheets — but the
+selection is the kernel's. The generated files record the kernel version and
+commit they came from. Anyone redistributing this firmware commercially
+should form their own view, or take advice, rather than rely on this note.

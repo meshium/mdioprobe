@@ -1,0 +1,10 @@
+# Copyright (c) 2026 Meshium
+# SPDX-License-Identifier: Apache-2.0
+
+# The MicroPython Zephyr port ships its own Kconfig with every MICROPY_*
+# symbol we need — including the ROM feature-level choice its mpconfigport.h
+# insists on — and it sources Kconfig.zephyr itself. Pulling it in beats
+# restating those symbols here, which would silently drift from upstream.
+#
+# Values for this board live in prj.conf.
+rsource "third_party/micropython/ports/zephyr/Kconfig"

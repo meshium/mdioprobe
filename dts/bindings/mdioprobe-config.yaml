@@ -1,0 +1,22 @@
+description: MDIO Probe board configuration
+
+compatible: "mdioprobe,config"
+
+properties:
+  io-channels:
+    type: phandle-array
+    description: |
+      ADC channel used to sample the idle voltage of the sniffed MDIO line
+      (PB14 / ADC1_IN5). Drives comparator threshold autocal and the default
+      target voltage of the programmable translator supply.
+
+  io-channel-names:
+    type: string-array
+
+  target-reset-gpios:
+    type: phandle-array
+    description: |
+      Optional GPIO driving the target's PHY_RST pin. Open-drain, no pull:
+      the pull-up must come from the target's own supply so the probe never
+      back-powers a board that is off. Asserted for ~10 ms at startup so the
+      probe can watch the target's MDIO init sequence from a clean state.

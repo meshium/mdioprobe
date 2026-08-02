@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: Apache-2.0
+
+CONFIG_ARM_MPU=y
+CONFIG_HW_STACK_PROTECTION=y
+
+# There is no on-board VCP: the console lives on USB CDC ACM (see the
+# `cdc-acm-console` snippet, appended by default in CMakeLists.txt).
+CONFIG_SERIAL=y
+CONFIG_CONSOLE=y
+CONFIG_UART_CONSOLE=y

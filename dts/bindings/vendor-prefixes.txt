@@ -1,0 +1,7 @@
+#
+# Additional vendor prefixes for this application.
+# See Zephyr: dts/bindings/vendor-prefixes.txt
+#
+mdioprobe	MDIO Probe project
+
+meshium	Meshium
