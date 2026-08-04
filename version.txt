@@ -1,5 +1,9 @@
-# Release version of the firmware. Bump deliberately; the build never
-# rewrites this file.
+# Release version of the firmware.
+#
+# MAJOR and MINOR are bumped deliberately, by hand — they say what release
+# this is meant to be. PATCH is counted rather than chosen: a commit hook
+# increments it and stages the result, so every commit carries its own. The
+# build itself never writes here.
 MAJOR=0
 MINOR=1
-PATCH=0
+PATCH=2

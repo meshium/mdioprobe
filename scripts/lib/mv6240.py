@@ -2,8 +2,11 @@
 
 Load with `use mv6240`. Copy to /flash/lib on the probe.
 
-**NOT VERIFIED.** Written from the documents; nothing here has been executed
-against the silicon. Sources:
+**VERIFIED** on an 88E6240 rev 1 on 2026-08-04: identification, port status,
+PHYDetect read and written, the SMI PHY window, `probe` across all 32
+addresses, the SERDES page and a software reset. Where silicon disagreed
+with the documents it is said so below, next to the claim it replaced.
+Sources:
 
     FS   88E6352/88E6240/88E6176/88E6172 Functional Specification
     DS   the matching datasheet
@@ -12,15 +15,25 @@ What differs from the 88E6321:
 
   * five internal PHYs on ports 0-4, at SMI device addresses 0x00-0x04, and
     a single SERDES at 0x0F — not two at 0x0C/0x0D (FS Figure 60, p. 211;
-    FS Table 60, p. 216). The fibre registers on that SERDES live on page 1,
-    so register 22 has to be set to 0x1 first (FS Table 374, p. 472).
+    FS Table 60, p. 216). That 0x0F was read off a figure nothing could be
+    extracted from, and it is now confirmed: 0x0F is the address that
+    answers with model 0x2a, the SERDES number. The fibre registers live on
+    page 1, so register 22 has to be set to 0x1 first (FS Table 374,
+    p. 472) — and it really does read 0x0000 out of a software reset, so
+    that write is required rather than defensive.
   * external PHYs attach to ports 5 and 6 only, and their SMI addresses must
     equal the port number for the PPU to poll them (DS p. 52).
   * Global3 exists at device address 0x1D (TCAM, 6352/6240 only).
-  * Global1 0x00 bits 15:12 are Reserved — there is no PPUState here at all
-    (FS Table 94, p. 262), so a poll on bit 15 reads a constant zero.
+  * Global1 0x00 bits 15:12 are Reserved in the document (FS Table 94,
+    p. 262) — and are not zero on the part. An 88E6240 rev 1 reads 0xc800
+    in that register, unchanged across a software reset, so those four bits
+    are 0b1100 and bit 15 reads one. On the 88E6321 that same bit is
+    PPUState, where one means "PPU polling", which is what this looks like.
+    Do not poll it expecting a zero.
   * Global1 0x04 bit 14 is plain "Reserved for future use" (FS Table 98,
-    p. 266). No PPUEn field exists in the specification.
+    p. 266) and no PPUEn field exists in the specification — but it reads as
+    a one, 0x4001 measured, the way the 88E6390 documents for its own. That
+    is why `reset` writes it back as it found it.
 
 Two absences worth stating out loud, because both look like missing
 features until you check:
@@ -48,12 +61,15 @@ from cli.cmd_mdio import apply_modify
 from cli.parser import ranged, spec
 from cli.registry import CommandError, command
 
-VERIFIED = False
+VERIFIED = True
 
-# FS Table 64, p. 221. The 88E6240's own product number is not printed in
-# either document — see _id() for what that costs.
+# FS Table 64, p. 221, plus one number no document here prints: an 88E6240
+# rev 1 identifies as 0x2401, so product 0x240, read off the part on
+# 2026-08-04. It is in the table on that authority alone, which is also why
+# _id() still lets an unrecognised number through — see there.
 PARTS = {
     0x352: "88E6352",
+    0x240: "88E6240",
     0x176: "88E6176",
     0x172: "88E6172",
 }
@@ -99,14 +115,15 @@ def _switch(token, check=True):
 
 
 def _id(ctx, args):
-    """Identify, and be honest about the one part this cannot name.
+    """Identify, and stay useful on a part no table names.
 
     The specification lists product numbers for the 6352, 6176 and 6172 but
-    not for the 6240 itself. Refusing everything unrecognised would make a
-    helper called mv6240 useless on an 88E6240, so an unknown number is
-    reported as unknown and the other commands are still allowed — the
-    register map is shared across the document, which is the whole reason
-    these four are in one specification.
+    not for the 6240 itself; 0x240 is known here because it was read off a
+    part, not because a document gives it. Whatever else shares this register
+    map is in the same position, so an unrecognised number is reported as
+    unrecognised and the other commands are still allowed — the map is shared
+    across the document, which is the whole reason these four are in one
+    specification.
     """
     if len(args) != 1:
         raise CommandError("usage: mv6240 id <sw>")
@@ -115,22 +132,20 @@ def _id(ctx, args):
     ident = sw.read(_port(0), 0x03)
     part = PARTS.get(ident >> 4)
 
-    ctx.out.line("this helper is written from the documents and has never "
-                 "been run against the silicon")
-
     if part is None:
-        ctx.out.line("switch 0x{:02x}: identifier 0x{:04x} — not one of the "
-                     "numbers the specification prints", sw.addr, ident)
-        ctx.out.line("  it lists 0x352x, 0x176x and 0x172x and never gives "
-                     "the 88E6240's own, so this may still be the right "
-                     "family; check the part marking")
+        ctx.out.line("switch 0x{:02x}: identifier 0x{:04x} — not a number "
+                     "this helper knows", sw.addr, ident)
+        ctx.out.line("  it knows 0x352x, 0x240x, 0x176x and 0x172x, and the "
+                     "specification prints all but the second, so this may "
+                     "still be the right family; check the part marking")
     else:
         ctx.out.line("switch 0x{:02x}: {} rev {}  (id 0x{:04x})",
                      sw.addr, part, ident & 0x0F, ident)
 
     status = sw.read(marvell.GLOBAL1, G1_STATUS)
-    ctx.out.line("Global1 status 0x{:04x}: init {}  (no PPUState on this "
-                 "family — bits 15:12 are Reserved)", status,
+    ctx.out.line("Global1 status 0x{:04x}: init {}  (bits 15:12 are Reserved "
+                 "in the document and not zero on the part — see the module "
+                 "comment)", status,
                  "ready" if status & G1_STATUS_INIT_READY else "not ready")
 
     ctx.out.line("{} ports, registers at 0x{:02x}+n, Global3 at 0x{:02x}",
@@ -201,7 +216,9 @@ def _reset(ctx, args):
         raise CommandError("Global1 control reads 0xffff — no answer from the "
                            "switch, refusing to write a guess into it")
 
-    # Bit 14 left as read: Reserved on this family, and not a PPU enable.
+    # Bit 14 left as read: Reserved on this family, and not a PPU enable —
+    # and it reads as a one (0x4001 on an 88E6240 rev 1), so writing the
+    # register back from a constant would clear something the part holds set.
     # The specification asks for all ports to be disabled and 2 ms of quiet
     # before the reset; that is left to the operator rather than done here,
     # because disabling ports is a bigger decision than a reset command
@@ -225,13 +242,16 @@ def _reset(ctx, args):
 # published and different for the two blocks: the copper PHY reads "Always
 # 101011" (FS p.438, Table 316) and the SERDES "Always 101010" (FS p.477,
 # Table 379). Nowhere else in the Link Street line does the identifier say
-# what kind of block answered.
+# what kind of block answered. Both hold: the five internal PHYs read
+# 0x01410eb1 and the SERDES 0x01410ea1.
 MODEL_COPPER = 0x2B
 MODEL_SERDES = 0x2A
 
 # Fibre/SERDES registers live on page 1 and, unlike the 88E6321, the page
 # register does not come up there: "the Page Address (Reg 22) must first be
-# set to 0x1" (FS p.472, Table 374). Write exactly 0x0001 -- bits 15:14 are
+# set to 0x1" (FS p.472, Table 374). Confirmed — register 22 reads 0x0000
+# straight out of a software reset, and reads of 2 and 3 on page 0 return
+# zeros rather than an identifier. Write exactly 0x0001: bits 15:14 are
 # the Ignore PHYAD broadcast bits, and catching one of those sends the write
 # to every port at once.
 PAGE_SELECT = 22
@@ -253,10 +273,16 @@ def _kind(ident):
 def _polled(sw, addr):
     """Whether the PPU visits the port this address belongs to.
 
-    Reported, never written. Measured on an 88E6321 — the family this one is
-    written against, not run against — clearing PHYDetect made no difference
-    to reading registers 2 and 3 through the window. The bit gates the PPU's
-    poll routine, and `port <sw> detect on` is where setting it lives.
+    Reported, never written. On an 88E6321 clearing PHYDetect made no
+    difference to reading registers 2 and 3 through the window, and an
+    88E6240 agrees: the RTL8211Fs on its ports 5 and 6 both answered the
+    window with the bit clear.
+
+    Setting it is not cosmetic, though, which is why it is not done here.
+    Measured on port 5: the status register went from 0x0e07 to 0x1007, link
+    up to link down, because with the bit set the register reports the PHY
+    the PPU polls rather than the forced state — and that PHY had no cable.
+    `port <sw> detect on` is where that decision lives.
     """
     if addr >= PORTS:
         return ""
@@ -335,12 +361,13 @@ _GROUPS = {
          summary="88E6352/6240/6176/6172: identify, port status, reset",
          detail=_USAGE + """
 
-WRITTEN FROM THE DOCUMENTS, NEVER RUN. Nothing here has touched silicon.
+VERIFIED on an 88E6240 rev 1, identifier 0x2401, on 2026-08-04.
 
 Ports are at device address 0x10+n as on the 88E6321, but the PHY map is
 different: five internal PHYs on ports 0-4 at SMI addresses 0x00-0x04, one
 SERDES at 0x0F whose fibre registers are on page 1, and external PHYs on
-ports 5 and 6 only. Global3 lives at 0x1D.
+ports 5 and 6 only. Global3 lives at 0x1D. All of that was read off a part
+rather than only off the documents.
 
 There is no `extbus`, and that is not an omission. This family has no
 NormalSMI bit: the external MDIO_PHY/MDC_PHY pins are selected by the
@@ -350,10 +377,14 @@ not carry that command across.
 
 There is also no PPU precondition. The datasheet says software may use the
 Global2 SMI PHY window at any time, which is the opposite of the 88E6321,
-and is why `mv phy` no longer enforces anything on its own.
+and is why `mv phy` no longer enforces anything on its own. Every read here
+went through that window with nothing done about the PPU, which is as far as
+the claim can be tested: this family exposes no way to stop the PPU, so the
+failing case cannot be produced to compare against.
 
-Global1 0x00 has no PPUState field on this family, so `id` reports only
-init-ready.
+Global1 0x00 is documented as having no PPUState field, so `id` reports only
+init-ready — but bits 15:12 are not zero on the part and bit 15 reads one.
+The module comment has the measurement.
 
 `probe` names every PHY behind the switch through the SMI PHY window, over
 all 32 addresses rather than only the mapped ones: a PHY strapped to an

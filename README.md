@@ -79,6 +79,7 @@ hardware/       KiCad project: schematic, PCB, gerbers
 docs/CAPTURE.md   how a frame is captured, end to end
 docs/HARDWARE.md  pinout, connector, and what the schematic actually does
 tools/con.py    console driver for the bench
+tools/upload.py put files on the volume without unplugging
 ```
 
 Zephyr APIs are used for ADC, GPIO, flash, UART, I2C and USB; the comparators,
