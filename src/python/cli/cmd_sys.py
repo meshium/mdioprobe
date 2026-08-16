@@ -2,7 +2,15 @@
 
 import mdioprobe
 
+from cli.parser import ranged
 from cli.registry import CommandError, by_category, command, lookup, ordered_categories
+
+# A running command cannot be interrupted on this firmware: the console path
+# never scans input for the interrupt character, so Ctrl-C is only read
+# between commands. That makes the ceiling load-bearing rather than tidy — a
+# mistyped `sleep 600000` would be ten minutes with a power cycle as the only
+# way out. Same reasoning as `monitor`'s default duration.
+SLEEP_MAX_MS = 60000
 
 
 def _print_detail(ctx, text):
@@ -79,6 +87,34 @@ def cmd_exec(ctx, args):
             ctx.out.line("+ {}", line)
             if not ctx.shell.run_line(line):
                 raise CommandError("stopped at line {} of {}".format(number, args[0]))
+
+
+@command("sleep", category="system", syntax="sleep <ms>",
+         summary="wait, for a script that needs a step to settle",
+         detail="""
+Milliseconds, matching `rst` and `mdc`, and at most 60000.
+
+A pause is a command rather than something `exec` understands so that the
+line means the same thing typed at the prompt as it does in a file — `exec`
+has no syntax of its own beyond blank lines and `#`, and it is worth keeping
+that way.
+
+The ceiling is not tidiness. A running command cannot be interrupted on this
+firmware: the console path never scans input for the interrupt character, so
+Ctrl-C is only read between commands. A mistyped `sleep 600000` would be ten
+minutes with a power cycle as the only way out.
+
+For anything that needs a loop or a condition rather than a fixed wait, use
+`script <file>`, where `time.sleep_ms()` is available along with the rest of
+Python.
+""")
+def cmd_sleep(ctx, args):
+    import time
+
+    if len(args) != 1:
+        raise CommandError("usage: sleep <ms>")
+
+    time.sleep_ms(ranged(args[0], 0, SLEEP_MAX_MS, "sleep"))
 
 
 @command("use", category="system", syntax="use [module | drop [module]]",

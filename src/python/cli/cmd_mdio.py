@@ -105,7 +105,17 @@ def dump(ctx, registers, read, label, width=2, vwidth=4):
     One register that will not answer must not cost the other thirty-one.
     A dump is usually how you find out *which* register is the problem, and
     aborting at the first one hides exactly that.
+
+    Surviving a failure is not the same as forgiving it, though: the last one
+    is re-raised after every register has been printed, so the command still
+    ends in error. That is what `exec` stops on, and it has to — a script
+    whose reads all came back errno 5 must not go on to the writes that were
+    meant to depend on them. The re-raise carries the original OSError rather
+    than a new message, so the shell explains it the same way it explains a
+    single failed read.
     """
+    failure = None
+
     for r in registers:
         try:
             ctx.out.line("{} 0x{:0{}x} = 0x{:0{}x}", label, r, width,
@@ -113,6 +123,10 @@ def dump(ctx, registers, read, label, width=2, vwidth=4):
         except OSError as exc:
             ctx.out.line("{} 0x{:0{}x} = ERROR (errno {})", label, r, width,
                          exc.args[0] if exc.args else "?")
+            failure = exc
+
+    if failure is not None:
+        raise failure
 
 
 def _dump(ctx, bus, registers, mode):
