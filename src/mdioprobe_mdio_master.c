@@ -576,58 +576,99 @@ static int transact_frame(bool is_write, uint8_t prtad, uint8_t regad, uint16_t 
 		mdio_drive(1);
 	} else {
 		/*
-		 * Turnaround — detected, not assumed.
+		 * Turnaround — one clock, then the data. Counted, not hunted.
 		 *
 		 * Clause 22 gives TA two bit times: the STA releases MDIO for
 		 * the first, the PHY drives a zero during the second, and data
-		 * starts after that. Real devices are not all that tidy. The
-		 * Marvell target on this bench claims the bus in the *first* TA
-		 * slot and already presents data bit 15 in the second, so a
-		 * fixed two-slot skip read every value one bit late — measured
-		 * 2026-07-30, switch ID 0x3102 came back as 0x6205, exactly
-		 * (value << 1) | 1, the trailing 1 being the idle line. Worse,
-		 * the bit checked for turnaround was really data bit 15, so any
-		 * register with the top bit set was reported as -EIO.
+		 * starts after that. Every part this probe has met answers a
+		 * bit earlier than that — the acknowledgement lands in the
+		 * first TA slot and data bit 15 in the second — whatever the
+		 * datasheets draw. The 88E6240 Functional Specification Table
+		 * 48 spells the frame out as "z0", and the silicon does not do
+		 * it: a fixed two-slot skip read 0x3102 back as 0x6205, exactly
+		 * (value << 1) | 1, measured 2026-07-30.
 		 *
-		 * So look for the zero instead of counting to it: whichever of
-		 * the two TA slots the PHY claims in, data starts on the next
-		 * bit.
+		 * Measured directly on 2026-08-21 against an 88E6390 (rev 1,
+		 * identifier 0x3901) with a diagnostic that samples the line
+		 * twice per clock — see mdioprobe_mdio_master_probe(). Counting
+		 * MDC pulses from the start of the frame, so that clock 46 is
+		 * the last address bit:
 		 *
-		 * Two ones in a row mean nobody answered — normally. The
-		 * 88E6390 release notes (MV-S302664 §3.13) describe a Rev A0
-		 * defect where the switch does not drive MDIO low after the
-		 * address cycle at all: the data that follows is correct, only
-		 * the acknowledgement is missing, and the note's own remedy is
-		 * for the master to tolerate it. Against such a part every read
-		 * here would return -EIO and throw a good value away.
+		 *   clock 47   nothing driven, line high
+		 *   clock 48   data bit 15
+		 *   ...
+		 *   clock 63   data bit 0
+		 *   clock 64   released
 		 *
-		 * Tolerating it is not the default, and the reason is measured
-		 * rather than cautious. With the check relaxed, a scan of a bus
-		 * that already had another master on it reported all 32
-		 * addresses as answering, with different garbage at each: the
-		 * turnaround is doing real work as a validity filter, and
-		 * losing it turns collisions into plausible data. So the strict
-		 * rule stays and the tolerance is asked for explicitly, by
-		 * whoever knows they are talking to an affected part.
+		 * Identical strings at 100, 500 and 2000 kHz, which rules out
+		 * every propagation-delay explanation: the offset is counted,
+		 * not analogue. The bit at clock 48 tracks the register
+		 * contents, so it is data and not a smeared acknowledgement,
+		 * and the level shifter in the path cannot be the cause. Nor is
+		 * it: mdioprobe_v1, whose stock Zephyr mdio_gpio driver skips
+		 * exactly one turnaround clock and never looks at the
+		 * acknowledgement, reads this part flawlessly over the same
+		 * harness and the same TXS0102 — six patterns including 0xAAAA
+		 * and 0x8001, all exact.
+		 *
+		 * So the data always starts at clock 48, and the one clock
+		 * before it carries the acknowledgement or nothing. That is
+		 * v1's alignment, which is the one with field mileage across
+		 * Marvell switches and ordinary PHYs alike.
+		 *
+		 * The previous version of this code hunted for the zero instead
+		 * and let the hunt decide where data began. That works while
+		 * the acknowledgement is there, and it is what made the 88E6240
+		 * read correctly. It breaks on a part that does not drive it —
+		 * the 88E6390 Rev A0 defect of MV-S302664 §3.13 — because the
+		 * hunt then swallows data bit 15 as a candidate and every value
+		 * comes back ((v & 0x7fff) << 1) | 1. Worse, it broke silently:
+		 * with bit 15 clear the missing acknowledgement is
+		 * indistinguishable from a real one, so the read returned a
+		 * shifted value and no error at all.
+		 *
+		 * What the acknowledgement is still for is telling a device
+		 * from silence, and that job is kept whole here — it just no
+		 * longer decides the alignment. The strictness is worth its
+		 * keep: with the check relaxed, a scan of a bus that already
+		 * had another master on it reported all 32 addresses as
+		 * answering, with different garbage at each. So the strict rule
+		 * stays the default and the tolerance is asked for explicitly,
+		 * by whoever knows they are talking to an affected part — and
+		 * now that tolerance yields the right value rather than a
+		 * shifted one, which is what the release note's own remedy
+		 * always claimed it would.
+		 *
+		 * The cost, stated plainly: a part that really does follow the
+		 * datasheet, with the acknowledgement at clock 48 and data from
+		 * 49, would now read one bit right. Neither probe has met one.
 		 */
 		mdio_pin_highz();
 
-		bool claimed = false;
-
-		for (int i = 0; i < 2 && !claimed; i++) {
-			claimed = (read_bit() == 0);
-		}
+		/* Clock 47: the acknowledgement, or nothing. Diagnostic only. */
+		bool claimed = (read_bit() == 0);
 
 		uint16_t v = 0;
 
+		/* Clocks 48..63. */
 		for (int i = 0; i < 16; i++) {
 			v = (v << 1) | (uint16_t)read_bit();
 		}
 		*data = v;
 
+		/*
+		 * Clock 64, discarded. The target holds data bit 0 until a
+		 * rising edge tells it to let go — measured, it releases just
+		 * after clock 64 — so stopping at 63 would leave it driving
+		 * into an idle bus, and a zero there would look exactly like a
+		 * line held low. It also keeps the frame 64 clocks long, which
+		 * is what Clause 22 asks for and what v1 emits.
+		 */
+		(void)read_bit();
+
 		if (!claimed && (strict_ta || v == 0xFFFFU)) {
-			/* Nobody claimed the bus. All ones means nothing drove
-			 * it either, which is the idle line and no device. */
+			/* Nobody acknowledged. All ones means nothing drove the
+			 * line either, which is the idle line and no device. */
 			rc = -EIO;
 		}
 	}
@@ -797,6 +838,81 @@ int mdioprobe_mdio_master_init(void)
 	LOG_INF("MDIO master ready at %u kHz (%u cycles/half-period): "
 		"MDC=PB7 (buffer EN=PB6), MDIO out=PB8, in=COMP7/PB14",
 		mdc_clock_khz, mdc_half_cycles);
+	return 0;
+}
+
+/*
+ * DIAGNOSTIC — not part of the master's normal path.
+ *
+ * Sends a read frame's header exactly as transact_frame() does, then instead
+ * of decoding, samples the line twice in every clock and hands both bit
+ * strings back raw:
+ *
+ *   early[i]  taken at the end of the HIGH half of clock 47+i
+ *             (where read_bit() samples today)
+ *   late[i]   taken at the end of the LOW half, just before the rising
+ *             edge of clock 47+i
+ *
+ * so late[0] still belongs to clock 46 — the master's own last address bit —
+ * and is a free sanity check that the numbering is what we think it is.
+ *
+ * The point is to settle, by measurement rather than by argument, where a
+ * target puts its turnaround zero and its data bit 15 relative to the clocks
+ * this master actually emits, and on which side of which edge it switches.
+ * Two samples per clock is what separates "the device answers a bit early"
+ * from "we sample a bit late" — one sample cannot tell those apart.
+ *
+ * The extra sense read lengthens the low half slightly, so run this well
+ * below the top of the clock range where that is noise.
+ */
+int mdioprobe_mdio_master_probe(uint8_t prtad, uint8_t regad, uint32_t nbits,
+				uint32_t *early, uint32_t *late)
+{
+	if (early == NULL || late == NULL || nbits == 0U || nbits > 32U) {
+		return -EINVAL;
+	}
+	if (!initialised) {
+		int err = mdioprobe_mdio_master_init();
+
+		if (err) {
+			return err;
+		}
+	}
+
+	k_mutex_lock(&master_lock, K_FOREVER);
+	buffer_up();
+
+	uint32_t e = 0;
+	uint32_t l = 0;
+	unsigned int key = irq_lock();
+
+	send_preamble();
+	write_bits(0x1, 2);           /* ST = 01 */
+	write_bits(0x2, 2);           /* OP = 10, read */
+	write_bits(prtad & 0x1F, 5);
+	write_bits(regad & 0x1F, 5);
+
+	mdio_pin_highz();
+
+	for (uint32_t i = 0; i < nbits; i++) {
+		wait_half_period();
+		l = (l << 1) | (uint32_t)mdio_sense();
+		mdc_set(1);
+		wait_half_period();
+		e = (e << 1) | (uint32_t)mdio_sense();
+		mdc_set(0);
+	}
+
+	irq_unlock(key);
+
+	mdc_set(0);
+	mdio_pin_highz();
+
+	last_use_ms = k_uptime_get();
+	k_mutex_unlock(&master_lock);
+
+	*early = e;
+	*late = l;
 	return 0;
 }
 

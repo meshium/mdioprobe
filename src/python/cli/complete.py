@@ -30,6 +30,7 @@ _KEYWORDS = {
                 1: ("read", "write", "modify", "monitor")},
     "probe":   {0: ("mmd",)},
     "trace":   {0: ("on", "off")},
+    "ta":      {0: ("strict", "relaxed")},
     "mode":    {0: ("mdio", "uart", "i2c")},
     "bus":     {0: ("force", "auto")},
     "vreg":    {0: ("off", "reset")},

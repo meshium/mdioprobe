@@ -67,10 +67,27 @@ uint32_t mdioprobe_mdio_master_measure_clock(void);
  * On by default. Turning it off tolerates a target that returns data without
  * driving the acknowledgement — an 88E6390 Rev A0 defect (MV-S302664 §3.13)
  * whose documented remedy is exactly that. The cost is that collisions on a
- * bus with another master start looking like data.
+ * bus with another master start looking like data. `ta` in the CLI.
+ *
+ * This governs belief only, never alignment: the data is read from the same
+ * clocks either way, so with the check off an affected part yields the right
+ * value rather than a shifted one. That was not true before 2026-08-21, when
+ * the turnaround zero also decided where data began.
  */
 void mdioprobe_mdio_master_set_strict_ta(bool on);
 bool mdioprobe_mdio_master_get_strict_ta(void);
+
+/**
+ * DIAGNOSTIC. Send a read frame's header, then sample the line twice per
+ * clock for `nbits` clocks and return both bit strings, MSB = first clock.
+ *
+ * `early` is sampled where read_bit() samples (end of the high half of clock
+ * 47+i); `late` at the end of the low half, so late's first bit still belongs
+ * to clock 46. Two samples per clock is what tells "the target answers a bit
+ * early" apart from "we sample a bit late".
+ */
+int mdioprobe_mdio_master_probe(uint8_t prtad, uint8_t regad, uint32_t nbits,
+				uint32_t *early, uint32_t *late);
 
 /** Clause-22 read. Returns 0, -EIO if the PHY never drove the TA bit. */
 int mdioprobe_mdio_master_read(uint8_t prtad, uint8_t regad, uint16_t *data);

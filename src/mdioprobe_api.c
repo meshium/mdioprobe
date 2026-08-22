@@ -457,6 +457,42 @@ uint32_t mdioprobe_c22_get_clock(void)
 	return mdioprobe_mdio_master_get_clock();
 }
 
+int mdioprobe_c22_probe(uint8_t prtad, uint8_t regad, uint32_t nbits,
+			uint32_t *early, uint32_t *late)
+{
+	/* Same interlocks as master_xfer(). Skipping bus_inhibit() the first
+	 * time round left the detector sampling PB14 through the probe and
+	 * every clock read back low, including the master's own address bits.
+	 */
+	if (!mdioprobe_bus_ready()) {
+		return -ENODEV;
+	}
+	if (mdioprobe_serial_get_mode() != MDIOPROBE_SERIAL_MODE_MDIO) {
+		return -EBUSY;
+	}
+
+	int err = apply_bus_settings();
+
+	if (err) {
+		return err;
+	}
+
+	err = supply_at_rail();
+	if (err) {
+		return err;
+	}
+
+	mdioprobe_bus_inhibit(true);
+	mdioprobe_led_activity_begin(MDIOPROBE_LED_BUS);
+
+	int rc = mdioprobe_mdio_master_probe(prtad, regad, nbits, early, late);
+
+	mdioprobe_led_activity_end(MDIOPROBE_LED_BUS);
+	mdioprobe_bus_inhibit(false);
+
+	return rc;
+}
+
 void mdioprobe_c22_set_strict_ta(bool on)
 {
 	mdioprobe_mdio_master_set_strict_ta(on);

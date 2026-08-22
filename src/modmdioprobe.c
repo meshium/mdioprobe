@@ -250,6 +250,24 @@ static mp_obj_t mod_c22_clock(size_t n_args, const mp_obj_t *args)
 static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(mod_c22_clock_obj, 0, 1,
 					   mod_c22_clock);
 
+/* DIAGNOSTIC: (early, late) bit strings, MSB = first clock after the address. */
+static mp_obj_t mod_c22_probe(size_t n_args, const mp_obj_t *args)
+{
+	uint32_t early = 0, late = 0;
+	mp_int_t nbits = (n_args > 2) ? mp_obj_get_int(args[2]) : 24;
+
+	check(mdioprobe_c22_probe(mp_obj_get_int(args[0]), mp_obj_get_int(args[1]),
+				  (uint32_t)nbits, &early, &late));
+
+	mp_obj_t t[3] = {
+		mp_obj_new_int_from_uint(early),
+		mp_obj_new_int_from_uint(late),
+		mp_obj_new_int(nbits),
+	};
+	return mp_obj_new_tuple(3, t);
+}
+static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(mod_c22_probe_obj, 2, 3, mod_c22_probe);
+
 static mp_obj_t mod_c22_strict_ta(size_t n_args, const mp_obj_t *args)
 {
 	if (n_args > 0) {
@@ -492,6 +510,7 @@ static const mp_rom_map_elem_t mdioprobe_module_globals_table[] = {
 	{ MP_ROM_QSTR(MP_QSTR_c22_write),       MP_ROM_PTR(&mod_c22_write_obj) },
 	{ MP_ROM_QSTR(MP_QSTR_c22_clock),       MP_ROM_PTR(&mod_c22_clock_obj) },
 	{ MP_ROM_QSTR(MP_QSTR_c22_strict_ta),   MP_ROM_PTR(&mod_c22_strict_ta_obj) },
+	{ MP_ROM_QSTR(MP_QSTR_c22_probe),       MP_ROM_PTR(&mod_c22_probe_obj) },
 
 	{ MP_ROM_QSTR(MP_QSTR_target_reset),    MP_ROM_PTR(&mod_target_reset_obj) },
 	{ MP_ROM_QSTR(MP_QSTR_target_reset_released),

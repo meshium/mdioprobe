@@ -211,6 +211,10 @@ uint32_t mdioprobe_c22_get_clock(void);
  * it; with the check on, every read of such a part fails while carrying a
  * perfectly good value.
  */
+/** DIAGNOSTIC. See mdioprobe_mdio_master_probe(). */
+int mdioprobe_c22_probe(uint8_t prtad, uint8_t regad, uint32_t nbits,
+			uint32_t *early, uint32_t *late);
+
 void mdioprobe_c22_set_strict_ta(bool on);
 bool mdioprobe_c22_get_strict_ta(void);
 

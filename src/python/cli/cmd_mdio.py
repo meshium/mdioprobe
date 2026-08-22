@@ -298,6 +298,46 @@ def cmd_trace(ctx, args):
     ctx.out.line("trace: {}", "on" if transport.tracing() else "off")
 
 
+@command("ta", category="mdio", syntax="ta [strict|relaxed]",
+         summary="whether a read must see the turnaround acknowledgement",
+         detail="""
+Clause 22 has the target drive a zero on the clock before the data. `strict`,
+the default, refuses a read that did not see it.
+
+    strict     no acknowledgement, no answer   (default)
+    relaxed    believe the data anyway
+
+Relaxed is a statement about the part in front of you, not a convenience. An
+88E6390 Rev A0 drives no acknowledgement at all (MV-S302664 §3.13), so every
+read on one fails until this is relaxed - measured against a rev 1 part on
+2026-08-21, where relaxing it read every register exactly.
+
+What you give up is real. The acknowledgement is the only positive evidence
+that a target executed the frame, and it is what makes 0xffff readable as a
+value: with no acknowledgement all ones cannot be told from an idle line, so
+that one value stays refused in either mode. It is also what keeps `scan`
+honest on a bus that has another master on it - with the check relaxed, a
+scan of such a bus reported all 32 addresses as answering, each with
+different garbage.
+
+What it never caught: a line held low from outside reads as acknowledged,
+with data 0x0000. For the state of the link use `bus` and `diag`.
+
+This does not decide where the data starts. Reads are aligned the same way in
+both modes; only belief changes. Not kept across a reset.
+""")
+def cmd_ta(ctx, args):
+    import mdioprobe
+
+    if args:
+        if args[0] not in ("strict", "relaxed"):
+            raise CommandError("usage: ta [strict|relaxed]")
+        mdioprobe.c22_strict_ta(args[0] == "strict")
+
+    ctx.out.line("turnaround: {}",
+                 "strict" if mdioprobe.c22_strict_ta() else "relaxed")
+
+
 @command("clock", category="mdio", syntax="clock [khz]",
          summary="MDC rate the master clocks at",
          detail="""

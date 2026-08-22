@@ -190,13 +190,22 @@ def cmd_use(ctx, args):
             "no module named {} — helpers live in /flash/lib; `ls /flash/lib` "
             "shows what is there".format(args[0]))
     except MemoryError:
+        # Report the number rather than a rule of thumb. "About two fit"
+        # was true while the helpers were 6-9 KB and stopped being true the
+        # moment one reached 14; the free heap says whether dropping the
+        # other one would even help.
+        import gc
+
+        gc.collect()
         loaded = " ".join(sorted(extend.LOADED))
         raise CommandError(
-            "out of memory loading {}. About two helpers fit at once{}".format(
-                args[0],
-                "; try `use drop {}`, and if that is still not enough, a soft "
-                "reset clears the heap properly".format(loaded) if loaded else
-                " — this one may simply be too big"))
+            "out of memory loading {} — {} bytes of heap free. How many fit "
+            "at once is a matter of their size, and the largest take most of "
+            "the heap on their own{}".format(
+                args[0], gc.mem_free(),
+                "; `use drop {}` first, and if that is still not enough, a "
+                "soft reset clears the heap properly".format(loaded)
+                if loaded else ""))
 
     if added:
         ctx.out.line("{}: {}", args[0], " ".join(added))
